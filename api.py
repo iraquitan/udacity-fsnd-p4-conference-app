@@ -42,7 +42,8 @@ class ConferenceApi(remote.Service):
 
     # - - - Profile objects - - - - - - - - - - - - - - - - - - -
 
-    def _copy_profile_to_form(self, prof):
+    @staticmethod
+    def _copy_profile_to_form(prof):
         """Copy relevant fields from Profile to ProfileForm."""
         # copy relevant fields from Profile to ProfileForm
         pf = ProfileForm()
@@ -57,7 +58,8 @@ class ConferenceApi(remote.Service):
         pf.check_initialized()
         return pf
 
-    def _get_profile_from_user(self):
+    @staticmethod
+    def _get_profile_from_user():
         """Return user Profile from datastore, creating new one if
         non-existent."""
         # TODO 2
@@ -103,14 +105,11 @@ class ConferenceApi(remote.Service):
         """Return user profile."""
         return self._do_profile()
 
-    # TODO 1
-    # 1. change request class
-    # 2. pass request to _do_profile function
-    @endpoints.method(message_types.VoidMessage, ProfileForm,
+    @endpoints.method(ProfileMiniForm, ProfileForm,
                       path='profile', http_method='POST', name='save_profile')
     def save_profile(self, request):
         """Update & return user profile."""
-        return self._do_profile()
+        return self._do_profile(request)
 
 
 # registers API
