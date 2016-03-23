@@ -9,4 +9,4 @@
 """
 # Replace the following lines with client IDs obtained from the APIs
 # Console or Cloud Console.
-WEB_CLIENT_ID = 'your-app-id'
+WEB_CLIENT_ID = 'your-web-client-id'
