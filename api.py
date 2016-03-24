@@ -26,6 +26,7 @@ from models import ProfileForm
 from models import TeeShirtSize
 
 from settings import WEB_CLIENT_ID
+from utils import get_user_id
 
 EMAIL_SCOPE = endpoints.EMAIL_SCOPE
 API_EXPLORER_CLIENT_ID = endpoints.API_EXPLORER_CLIENT_ID
@@ -67,12 +68,20 @@ class ConferenceApi(remote.Service):
         if not user:
             # Raise unauthorized exception if user not logged in
             raise endpoints.UnauthorizedException('Authorization required')
-        # Create profile with current user info
-        profile = Profile(
-            displayName=user.nickname(),
-            mainEmail=user.email()
-        )
 
+        # Generate a new key of kind Profile from user id
+        p_key = ndb.Key(Profile, get_user_id(user))
+
+        # Create profile with current user info
+        profile = None
+        if not profile:
+            print(user.user_id())
+            profile = Profile(
+                key=p_key,
+                displayName=user.nickname(),
+                mainEmail=user.email()
+            )
+            profile.put()
         return profile  # return Profile
 
     def _do_profile(self, save_request=None):
@@ -80,7 +89,7 @@ class ConferenceApi(remote.Service):
         # get user Profile
         prof = self._get_profile_from_user()
 
-        # if save_profile(), process user-modifiable fields
+        # if save_request, process user-modifiable fields
         if save_request:
             for field in ('displayName', 'teeShirtSize'):
                 if hasattr(save_request, field):

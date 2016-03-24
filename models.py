@@ -15,7 +15,7 @@ from google.appengine.ext import ndb
 
 class Profile(ndb.Model):
     """Profile -- User profile object"""
-    userId = ndb.StringProperty()
+    # userId = ndb.StringProperty()
     displayName = ndb.StringProperty()
     mainEmail = ndb.StringProperty()
     teeShirtSize = ndb.StringProperty(default='NOT_SPECIFIED')
