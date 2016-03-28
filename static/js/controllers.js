@@ -63,7 +63,7 @@ conferenceApp.controllers.controller('MyProfileCtrl',
             var retrieveProfileCallback = function () {
                 $scope.profile = {};
                 $scope.loading = true;
-                gapi.client.conference.getProfile().
+                gapi.client.conference.get_profile().
                     execute(function (resp) {
                         $scope.$apply(function () {
                             $scope.loading = false;
@@ -94,7 +94,7 @@ conferenceApp.controllers.controller('MyProfileCtrl',
         $scope.saveProfile = function () {
             $scope.submitted = true;
             $scope.loading = true;
-            gapi.client.conference.saveProfile($scope.profile).
+            gapi.client.conference.save_profile($scope.profile).
                 execute(function (resp) {
                     $scope.$apply(function () {
                         $scope.loading = false;
