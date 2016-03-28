@@ -72,10 +72,11 @@ class ConferenceApi(remote.Service):
         # Generate a new key of kind Profile from user id
         p_key = ndb.Key(Profile, get_user_id(user))
 
-        # Create profile with current user info
-        profile = None
+        # Get profile from Datastore
+        profile = p_key.get()
+
+        # Create profile with current user info if profile is not stored
         if not profile:
-            print(user.user_id())
             profile = Profile(
                 key=p_key,
                 displayName=user.nickname(),
@@ -96,7 +97,8 @@ class ConferenceApi(remote.Service):
                     val = getattr(save_request, field)
                     if val:
                         setattr(prof, field, str(val))
-
+            # Put profile to Datastore
+            prof.put()
         # return ProfileForm
         return self._copy_profile_to_form(prof)
 
