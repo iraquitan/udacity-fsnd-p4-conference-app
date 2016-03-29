@@ -20,7 +20,8 @@ from protorpc import remote
 from google.appengine.api import urlfetch
 from google.appengine.ext import ndb
 
-from models import Profile, ConferenceForm, Conference
+from models import Profile, ConferenceForm, Conference, ConferenceQueryForms, \
+    ConferenceForms
 from models import ProfileMiniForm
 from models import ProfileForm
 from models import TeeShirtSize
@@ -208,6 +209,18 @@ class ConferenceApi(remote.Service):
         """Create new conference."""
         return self._create_conference_object(request)
 
+    @endpoints.method(ConferenceQueryForms, ConferenceForms,
+                      path='queryConferences', http_method='POST',
+                      name='queryConferences')
+    def query_conferences(self, request):
+        """query_conferences documentation"""
+        conferences = Conference.query()
+
+        # return individual ConferenceForm object per Conference
+        return ConferenceForms(
+            items=[self._copy_conference_to_form(conf, "")
+                   for conf in conferences]
+        )
 
 # registers API
 api = endpoints.api_server([ConferenceApi])
