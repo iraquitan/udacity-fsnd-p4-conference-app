@@ -222,5 +222,29 @@ class ConferenceApi(remote.Service):
                    for conf in conferences]
         )
 
+    @endpoints.method(message_types.VoidMessage, ConferenceForms,
+                      path='getConferencesCreated', http_method='POST',
+                      name='getConferencesCreated')
+    def get_conferences_created(self, request):
+        """get_conferences_created documentation"""
+        # Make sure user is authenticated
+        user = endpoints.get_current_user()
+        if not user:
+            raise endpoints.UnauthorizedException("Authorization required.")
+
+        # Make profile key
+        p_key = ndb.Key(Profile, get_user_id(user))
+        # Create ancestor query for this user
+        conferences = Conference.query(ancestor=p_key)
+        # Get user profile and display name
+        profile = p_key.get()
+        display_name = getattr(profile, 'displayName')
+        # Return set of ConferenceForms per Conference
+        return ConferenceForms(
+            items=[self._copy_conference_to_form(conf, display_name)
+                   for conf in conferences]
+        )
+
+
 # registers API
 api = endpoints.api_server([ConferenceApi])
