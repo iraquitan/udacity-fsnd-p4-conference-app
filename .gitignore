@@ -1,7 +1,6 @@
 ### AppEngine template
 # Google App Engine generated folder
 appengine-generated/
-index.yaml
 
 ### OSX template
 .DS_Store
