@@ -245,6 +245,26 @@ class ConferenceApi(remote.Service):
                    for conf in conferences]
         )
 
+    @endpoints.method(message_types.VoidMessage, ConferenceForms,
+                      path='filterPlayground', http_method='GET',
+                      name='filterPlayground')
+    def filter_playground(self, request):
+        """filter_playground documentation"""
+        q = Conference.query()
+
+        # 1 - city equals to London
+        q = q.filter(Conference.city == "London")
+
+        # 2 - topic equals to Medical Innovations
+        q = q.filter(Conference.topics == "Medical Innovations")
+
+        # 3 - order by conference name
+        q = q.order(Conference.name)
+        # Return set of ConferenceForms per Conference
+        return ConferenceForms(
+            items=[self._copy_conference_to_form(conf, "")
+                   for conf in q]
+        )
 
 # registers API
 api = endpoints.api_server([ConferenceApi])
