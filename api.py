@@ -54,8 +54,15 @@ class ConferenceApi(remote.Service):
 
     @staticmethod
     def _copy_profile_to_form(prof):
-        """Copy relevant fields from Profile to ProfileForm."""
-        # copy relevant fields from Profile to ProfileForm
+        """
+        Copy relevant fields from Profile to ProfileForm.
+
+        Args:
+            prof: The Profile object.
+
+        Returns:
+            A ProfileForm object with relevant fields from Profile
+        """
         pf = ProfileForm()
         for field in pf.all_fields():
             if hasattr(prof, field.name):
@@ -70,9 +77,16 @@ class ConferenceApi(remote.Service):
 
     @staticmethod
     def _get_profile_from_user():
-        """Return user Profile from datastore, creating new one if
-        non-existent."""
-        # Get current user
+        """
+        Return user Profile from datastore, creating new one if non-existent.
+
+        Returns:
+            A Profile object from current user
+
+        Raises:
+            endpoints.UnauthorizedException: An error if current user is not
+            logged in.
+        """
         user = endpoints.get_current_user()
         if not user:
             # Raise unauthorized exception if user not logged in
@@ -95,8 +109,16 @@ class ConferenceApi(remote.Service):
         return profile  # return Profile
 
     def _do_profile(self, save_request=None):
-        """Get user Profile and return to user, possibly updating it first."""
-        # get user Profile
+        """
+        Get user Profile and return to ProfileForm, possibly updating it first.
+        If save_request is not None, update and put Profile to Datastore.
+
+        Args:
+            save_request: A request with fields to update.
+
+        Returns:
+            A ProfileForm with
+        """
         prof = self._get_profile_from_user()
 
         # if save_request, process user-modifiable fields
@@ -113,21 +135,43 @@ class ConferenceApi(remote.Service):
 
     @endpoints.method(message_types.VoidMessage, ProfileForm,
                       path='profile', http_method='GET', name='getProfile')
-    def get_profile(self, request):
-        """Return user profile."""
+    def get_profile(self):
+        """
+        API endpoint to return current user profile.
+
+        Returns:
+            A ProfileForm with the current user Profile.
+        """
         return self._do_profile()
 
     @endpoints.method(ProfileMiniForm, ProfileForm,
                       path='profile', http_method='POST', name='saveProfile')
     def save_profile(self, request):
-        """Update & return user profile."""
+        """
+        API endpoint to update & return user Profile.
+
+        Args:
+            request: The request sent to this API endpoint.
+
+        Returns:
+            A ProfileForm with the current user Profile updated by request.
+        """
         return self._do_profile(request)
 
     # - - - Conference objects - - - - - - - - - - - - - - - - -
 
     @staticmethod
     def _copy_conference_to_form(conf, displayName):
-        """Copy relevant fields from Conference to ConferenceForm."""
+        """
+        Copy relevant fields from Conference to ConferenceForm.
+
+        Args:
+            conf: The Conference object.
+            displayName: The name of the conference organizer.
+
+        Returns:
+            A ConferenceForm with relevant Conference fields.
+        """
         cf = ConferenceForm()
         for field in cf.all_fields():
             if hasattr(conf, field.name):
@@ -147,8 +191,19 @@ class ConferenceApi(remote.Service):
     def _create_conference_object(request):
         """
         Create or update Conference object, returning ConferenceForm/request.
+
+        Args:
+            request: The request sent to this API endpoint.
+
+        Returns:
+            Updated request.
+
+        Raises:
+            endpoints.UnauthorizedException: An error if current user is not
+            logged in.
+            endpoints.BadRequestException: An error if request does not have a
+            name field. This field is required.
         """
-        # preload necessary data items
         user = endpoints.get_current_user()
         if not user:
             raise endpoints.UnauthorizedException('Authorization required')
@@ -206,14 +261,30 @@ class ConferenceApi(remote.Service):
     @endpoints.method(ConferenceForm, ConferenceForm, path='conference',
                       http_method='POST', name='createConference')
     def create_conference(self, request):
-        """Create new conference."""
+        """
+        API endpoint to create new conference and stores it to Datastore.
+
+        Args:
+            request: The request sent to this API endpoint.
+
+        Returns:
+            Updated request.
+        """
         return self._create_conference_object(request)
 
     @endpoints.method(ConferenceQueryForms, ConferenceForms,
                       path='queryConferences', http_method='POST',
                       name='queryConferences')
     def query_conferences(self, request):
-        """query_conferences documentation"""
+        """
+        API endpoint to query and return all conferences in the Datastore.
+
+        Args:
+            request: The request sent to this API endpoint.
+
+        Returns:
+            A set of ConferenceForms per conference.
+        """
         conferences = Conference.query()
 
         # return individual ConferenceForm object per Conference
@@ -226,8 +297,20 @@ class ConferenceApi(remote.Service):
                       path='getConferencesCreated', http_method='POST',
                       name='getConferencesCreated')
     def get_conferences_created(self, request):
-        """get_conferences_created documentation"""
-        # Make sure user is authenticated
+        """
+        API endpoint to query and return all conferences created by current
+        user.
+
+        Args:
+            request: The request sent to this API endpoint.
+
+        Returns:
+            A set of ConferenceForms per conference.
+
+        Raises:
+            endpoints.UnauthorizedException: An error if current user is not
+            logged in.
+        """
         user = endpoints.get_current_user()
         if not user:
             raise endpoints.UnauthorizedException("Authorization required.")
@@ -249,7 +332,15 @@ class ConferenceApi(remote.Service):
                       path='filterPlayground', http_method='GET',
                       name='filterPlayground')
     def filter_playground(self, request):
-        """filter_playground documentation"""
+        """
+        API endpoint to test query with property filters.
+
+        Args:
+            request: The request sent to this API endpoint.
+
+        Returns:
+            A set of ConferenceForms per conference.
+        """
         q = Conference.query()
 
         # 1 - city equals to London
