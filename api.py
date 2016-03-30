@@ -39,6 +39,21 @@ DEFAULTS = {
     "topics": ["Default", "Topic"],
 }
 
+OPERATORS = {
+    'EQ': '=',
+    'GT': '>',
+    'GTEQ': '>=',
+    'LT': '<',
+    'LTEQ': '<=',
+    'NE': '!='
+}
+
+FIELDS = {
+    'CITY': 'city',
+    'TOPIC': 'topics',
+    'MONTH': 'month',
+    'MAX_ATTENDEES': 'maxAttendees',
+}
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -135,9 +150,12 @@ class ConferenceApi(remote.Service):
 
     @endpoints.method(message_types.VoidMessage, ProfileForm,
                       path='profile', http_method='GET', name='getProfile')
-    def get_profile(self):
+    def get_profile(self, request):
         """
         API endpoint to return current user profile.
+
+        Args:
+            request: The request sent to this API endpoint.
 
         Returns:
             A ProfileForm with the current user Profile.
@@ -272,6 +290,82 @@ class ConferenceApi(remote.Service):
         """
         return self._create_conference_object(request)
 
+    def _get_query(self, request):
+        """
+        Return formatted query from the submitted filters.
+
+        Args:
+            request: The request sent to this API endpoint.
+
+        Returns:
+            A query object after applying the filters.
+        """
+        q = Conference.query()
+        inequality_filter, filters = self._format_filters(request.filters)
+
+        # If exists, sort on inequality filter first
+        if not inequality_filter:
+            q = q.order(Conference.name)
+        else:
+            q = q.order(ndb.GenericProperty(inequality_filter))
+            q = q.order(Conference.name)
+
+        for filtr in filters:
+            if filtr["field"] in ["month", "maxAttendees"]:
+                filtr["value"] = int(filtr["value"])
+            formatted_query = ndb.query.FilterNode(filtr["field"],
+                                                   filtr["operator"],
+                                                   filtr["value"])
+            q = q.filter(formatted_query)
+        return q
+
+    @staticmethod
+    def _format_filters(filters):
+        """
+        Parse, check validity and format user supplied filters.
+
+        Args:
+            filters:
+
+        Returns:
+            A tuple with the inequality field, if used, and with the filters
+            formatted.
+
+        Raises:
+            endpoints.BadRequestException: An error if filter contains invalid
+            field or operator.
+            endpoints.BadRequestException: An error if more than one field is
+            using inequality operators.
+        """
+        formatted_filters = []
+        inequality_field = None
+
+        for f in filters:
+            filtr = {field.name: getattr(f, field.name) for field in
+                     f.all_fields()}
+
+            try:
+                filtr["field"] = FIELDS[filtr["field"]]
+                filtr["operator"] = OPERATORS[filtr["operator"]]
+            except KeyError:
+                raise endpoints.BadRequestException(
+                    "Filter contains invalid field or operator.")
+
+            # Every operation except "=" is an inequality
+            if filtr["operator"] != "=":
+                # check if inequality operation has been used in previous
+                # filters disallow the filter if inequality was performed on
+                # a different field before track the field on which the
+                # inequality operation is performed
+                if inequality_field and inequality_field != filtr["field"]:
+                    raise endpoints.BadRequestException(
+                        "Inequality filter is allowed on only one field.")
+                else:
+                    inequality_field = filtr["field"]
+
+            formatted_filters.append(filtr)
+        return inequality_field, formatted_filters
+
     @endpoints.method(ConferenceQueryForms, ConferenceForms,
                       path='queryConferences', http_method='POST',
                       name='queryConferences')
@@ -285,7 +379,7 @@ class ConferenceApi(remote.Service):
         Returns:
             A set of ConferenceForms per conference.
         """
-        conferences = Conference.query()
+        conferences = self._get_query(request)
 
         # return individual ConferenceForm object per Conference
         return ConferenceForms(
