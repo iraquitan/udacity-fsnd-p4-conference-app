@@ -37,7 +37,6 @@ A project for a conference app, where users can sign up with their Google accoun
 * <https://github.com/iraquitan>
 * <https://www.linkedin.com/in/iraquitan>
 * <https://twitter.com/iraquitan_filho>
-* <https://github.com/iraquitan>
 
 ## License
 The contents of this repository are covered under the [MIT License](LICENSE).
