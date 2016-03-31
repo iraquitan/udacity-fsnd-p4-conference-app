@@ -21,7 +21,7 @@ from google.appengine.api import urlfetch
 from google.appengine.ext import ndb
 
 from models import Profile, ConferenceForm, Conference, ConferenceQueryForms, \
-    ConferenceForms
+    ConferenceForms, BooleanMessage, ConflictException
 from models import ProfileMiniForm
 from models import ProfileForm
 from models import TeeShirtSize
@@ -54,6 +54,11 @@ FIELDS = {
     'MONTH': 'month',
     'MAX_ATTENDEES': 'maxAttendees',
 }
+
+CONF_GET_REQUEST = endpoints.ResourceContainer(
+    message_types.VoidMessage,
+    websafeConferenceKey=messages.StringField(1),
+)
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -454,6 +459,85 @@ class ConferenceApi(remote.Service):
             items=[self._copy_conference_to_form(conf, "")
                    for conf in q]
         )
+
+    # - - - Registration - - - - - - - - - - - - - - - - - - - -
+
+    @ndb.transactional(xg=True)
+    def _conference_registration(self, request, reg=True):
+        """
+        Register or unregister user for selected conference.
+
+        Args:
+            request: The request sent to this API endpoint.
+            reg (bool): True to register and False to unregister.
+
+        Returns:
+            A BooleanMessage of the final status of the transaction.
+
+        Raises:
+            endpoints.NotFoundException: An error if conference not found.
+            ConflictException: If user already registered for the conference.
+            ConflictException: If no seats available for the conference.
+        """
+        # retval = None
+        prof = self._getProfileFromUser()  # get user Profile
+
+        # check if conf exists given websafeConfKey
+        # get conference; check that it exists
+        wsck = request.websafeConferenceKey
+        conf = ndb.Key(urlsafe=wsck).get()
+        if not conf:
+            raise endpoints.NotFoundException(
+                'No conference found with key: %s' % wsck)
+
+        # register
+        if reg:
+            # check if user already registered otherwise add
+            if wsck in prof.conferenceKeysToAttend:
+                raise ConflictException(
+                    "You have already registered for this conference")
+
+            # check if seats avail
+            if conf.seatsAvailable <= 0:
+                raise ConflictException(
+                    "There are no seats available.")
+
+            # register user, take away one seat
+            prof.conferenceKeysToAttend.append(wsck)
+            conf.seatsAvailable -= 1
+            retval = True
+
+        # unregister
+        else:
+            # check if user already registered
+            if wsck in prof.conferenceKeysToAttend:
+
+                # unregister user, add back one seat
+                prof.conferenceKeysToAttend.remove(wsck)
+                conf.seatsAvailable += 1
+                retval = True
+            else:
+                retval = False
+
+        # write things back to the datastore & return
+        prof.put()
+        conf.put()
+        return BooleanMessage(data=retval)
+
+    @endpoints.method(CONF_GET_REQUEST, BooleanMessage,
+                      path='conference/{websafeConferenceKey}',
+                      http_method='POST', name='registerForConference')
+    def register_for_conference(self, request):
+        """
+        Register user for selected conference.
+
+        Args:
+            request: The request sent to this API endpoint.
+
+        Returns:
+            A BooleanMessage of the final status of the transaction.
+        """
+        return self._conference_registration(request)
 
 # registers API
 api = endpoints.api_server([ConferenceApi])
