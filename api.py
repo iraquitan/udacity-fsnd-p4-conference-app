@@ -427,6 +427,33 @@ class ConferenceApi(remote.Service):
                    for conf in conferences]
         )
 
+    @endpoints.method(CONF_GET_REQUEST, ConferenceForm,
+                      path='conference/{websafeConferenceKey}',
+                      http_method='GET', name='getConference')
+    def get_conference(self, request):
+        """
+        Return requested conference (by websafeConferenceKey).
+
+        Args:
+            request: The request sent to this API endpoint.
+
+        Returns:
+            A ConferenceForm whti the requested conference.
+
+        Raises:
+            endpoints.NotFoundException: An error if conference not found
+        """
+        # get Conference object from request; bail if not found
+        conf = ndb.Key(urlsafe=request.websafeConferenceKey).get()
+        if not conf:
+            raise endpoints.NotFoundException(
+                'No conference found with key: {}'.format(
+                    request.websafeConferenceKey))
+        prof = conf.key.parent().get()
+        # return ConferenceForm
+        return self._copy_conference_to_form(conf,
+                                             getattr(prof, 'displayName'))
+
     @endpoints.method(message_types.VoidMessage, ConferenceForms,
                       path='filterPlayground', http_method='GET',
                       name='filterPlayground')
