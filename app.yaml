@@ -37,6 +37,10 @@ handlers:
   script: main.app
   login: admin
 
+- url: /tasks/send_confirmation_email
+  script: main.app
+  login: admin
+
 libraries:
 - name: webapp2
   version: latest
