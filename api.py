@@ -535,8 +535,7 @@ class ConferenceApi(remote.Service):
             ConflictException: If user already registered for the conference.
             ConflictException: If no seats available for the conference.
         """
-        # retval = None
-        prof = self._getProfileFromUser()  # get user Profile
+        prof = self._get_profile_from_user()  # get user Profile
 
         # check if conf exists given websafeConfKey
         # get conference; check that it exists
