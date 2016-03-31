@@ -34,6 +34,7 @@ class ProfileForm(messages.Message):
     displayName = messages.StringField(2)
     mainEmail = messages.StringField(3)
     teeShirtSize = messages.EnumField('TeeShirtSize', 4)
+    conferenceKeysToAttend = messages.StringField(5, repeated=True)
 
 
 class TeeShirtSize(messages.Enum):
