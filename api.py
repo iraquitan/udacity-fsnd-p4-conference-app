@@ -13,6 +13,7 @@ import os
 import time
 
 import endpoints
+from google.appengine.ext.ndb import get_multi
 from protorpc import messages
 from protorpc import message_types
 from protorpc import remote
@@ -426,6 +427,34 @@ class ConferenceApi(remote.Service):
             items=[self._copy_conference_to_form(conf, display_name)
                    for conf in conferences]
         )
+
+    @endpoints.method(message_types.VoidMessage, ConferenceForms,
+                      path='conferences/attending',
+                      http_method='GET', name='getConferencesToAttend')
+    def get_conferences_to_attend(self, request):
+        """
+        Get list of conferences that user has registered for.
+
+        Args:
+            request: The request sent to this API endpoint.
+
+        Returns:
+            ConferenceForms of conferences user has registered.
+        """
+        # get user profile
+        profile = self._get_profile_from_user()
+        # get conferenceKeysToAttend from profile.
+        ckta = profile.conferenceKeysToAttend
+        # to make a ndb key from websafe key you can use:
+        # ndb.Key(urlsafe=my_websafe_key_string)
+        array_of_keys = [ndb.Key(urlsafe=ck) for ck in ckta]
+        # fetch conferences from datastore.
+        conferences = get_multi(array_of_keys)
+
+        # return set of ConferenceForm objects per Conference
+        return ConferenceForms(items=[self._copy_conference_to_form(conf, "")
+                                      for conf in conferences]
+                               )
 
     @endpoints.method(CONF_GET_REQUEST, ConferenceForm,
                       path='conference/{websafeConferenceKey}',
