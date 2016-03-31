@@ -8,13 +8,18 @@
  * Time: 12:15 AM
 """
 import webapp2
+from google.appengine.api import app_identity
+from google.appengine.api import mail
+from api import ConferenceApi
 
 
-class MainHandler(webapp2.RequestHandler):
+class SetAnnouncementHandler(webapp2.RequestHandler):
     def get(self):
-        self.response.write('Hello world!')
+        """Set Announcement in Memcache."""
+        announcement = ConferenceApi._cache_announcement()
+        self.response.write(announcement)
 
 
 app = webapp2.WSGIApplication([
-    ('/', MainHandler)
+    ('/crons/set_announcement', SetAnnouncementHandler),
 ], debug=True)
