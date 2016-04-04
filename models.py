@@ -121,21 +121,26 @@ class StringMessage(messages.Message):
 class Speaker(ndb.Model):
     """Speaker -- Please add a description"""
     name = ndb.StringProperty(required=True)
+    email = ndb.StringProperty()
     institution = ndb.StringProperty()
+    creatorUserId = ndb.StringProperty()
 
 
 class SpeakerForm(messages.Message):
     """SpeakerForm -- Please add a description"""
     name = messages.StringField(1, required=True)
-    institution = messages.StringField(2)
+    email = messages.StringField(2)
+    institution = messages.StringField(3)
+    creatorUserId = messages.StringField(4)
+    websafeKey = messages.StringField(5)
 
 
 class Session(ndb.Model):
     """Session -- Please add a description"""
     name = ndb.StringProperty(required=True)
     conferenceId = ndb.StringProperty(required=True)
+    speakerId = ndb.StringProperty()
     highlights = ndb.StringProperty(repeated=True)
-    speaker = ndb.StringProperty()
     duration = ndb.IntegerProperty()
     typeOfSession = ndb.StringProperty()
     date = ndb.DateProperty()
@@ -146,12 +151,13 @@ class SessionForm(messages.Message):
     """SessionForm -- Please add a description"""
     name = messages.StringField(1, required=True)
     conferenceId = messages.StringField(2)
-    highlights = messages.StringField(3, repeated=True)
-    speaker = messages.StringField(4)
+    speakerId = messages.StringField(3)
+    highlights = messages.StringField(4, repeated=True)
     duration = messages.IntegerField(5, variant=messages.Variant.INT32)
     typeOfSession = messages.StringField(6)
     date = messages.StringField(7)
     startTime = messages.StringField(8)
+    speakerName = messages.StringField(9)
 
 
 class SessionForms(messages.Message):
