@@ -24,7 +24,8 @@ from google.appengine.ext import ndb
 from google.appengine.api import memcache
 
 from models import Profile, ConferenceForm, Conference, ConferenceQueryForms, \
-    ConferenceForms, BooleanMessage, ConflictException, StringMessage
+    ConferenceForms, BooleanMessage, ConflictException, StringMessage, \
+    SessionForm, Session
 from models import ProfileMiniForm
 from models import ProfileForm
 from models import TeeShirtSize
@@ -60,6 +61,11 @@ FIELDS = {
 
 CONF_GET_REQUEST = endpoints.ResourceContainer(
     message_types.VoidMessage,
+    websafeConferenceKey=messages.StringField(1),
+)
+
+SESSION_REQUEST = endpoints.ResourceContainer(
+    SessionForm,
     websafeConferenceKey=messages.StringField(1),
 )
 
@@ -662,6 +668,90 @@ class ConferenceApi(remote.Service):
         if not announcement:
             announcement = ""
         return StringMessage(data=announcement)
+
+    # - - - Sessions - - - - - - - - - - - - - - - - - - - -
+
+    @staticmethod
+    def _copy_session_to_form(session):
+        """
+        Copy relevant fields from Session to SessionForm.
+
+        Args:
+            session: The Session object.
+
+        Returns:
+            A SessionForm with relevant Session fields.
+        """
+        ss = SessionForm()
+        for field in ss.all_fields():
+            if hasattr(session, field.name):
+                # convert Date to date string; just copy others
+                if field.name == 'date':
+                    setattr(ss, field.name, str(getattr(session, field.name)))
+                elif field.name == 'startTime':
+                    setattr(ss, field.name, str(getattr(session, field.name)))
+                else:
+                    setattr(ss, field.name, getattr(session, field.name))
+        ss.check_initialized()
+        return ss
+
+    def _create_session_object(self, request):
+        if not request.name:
+            raise endpoints.BadRequestException(
+                "Session 'name' field required")
+
+        # get Conference object from request; bail if not found
+        conf = ndb.Key(urlsafe=request.websafeConferenceKey).get()
+        if not conf:
+            raise endpoints.NotFoundException(
+                'No conference found with key: {}'.format(
+                    request.websafeConferenceKey))
+        owner_prof = conf.key.parent().get()
+        user = endpoints.get_current_user()
+        if not user:
+            raise endpoints.UnauthorizedException("Authorization required.")
+        user_id = get_user_id(user)
+        if owner_prof.mainEmail != user_id:
+            raise endpoints.UnauthorizedException(
+                "Only the conference organizer can create sessions.")
+
+        # copy SessionForm/ProtoRPC Message into dict
+        data = {field.name: getattr(request, field.name) for field in
+                request.all_fields()}
+
+        # convert dates from strings to Date objects and startTime to Time
+        # objects
+        if data['date']:
+            data['date'] = datetime.strptime(data['date'][:10],
+                                             "%Y-%m-%d").date()
+        if data['startTime']:
+            data['startTime'] = datetime.strptime(data['startTime'],
+                                                  "%H:%M").time()
+
+        c_key = ndb.Key(urlsafe=request.websafeConferenceKey)
+        # allocate new Session ID with Conference key as parent
+        s_id = Session.allocate_ids(size=1, parent=c_key)[0]
+        # make Session key from ID
+        s_key = ndb.Key(Session, s_id, parent=c_key)
+
+        data['key'] = s_key
+        request.conferenceId = request.websafeConferenceKey
+        data['conferenceId'] = request.conferenceId
+        del data['websafeConferenceKey']
+
+        # create Session & return (modified) SessionForm
+        sess = Session(**data)
+        sess.put()
+
+        return self._copy_session_to_form(sess)
+
+    @endpoints.method(SESSION_REQUEST, SessionForm,
+                      path='conference/{websafeConferenceKey}/addsession',
+                      http_method='POST', name='createSession')
+    def create_session(self, request):
+        """create_session documentation"""
+        return self._create_session_object(request)
+
 
 # registers API
 api = endpoints.api_server([ConferenceApi])
