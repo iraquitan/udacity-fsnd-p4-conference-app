@@ -15,7 +15,6 @@ from google.appengine.ext import ndb
 
 class Profile(ndb.Model):
     """Profile -- User profile object"""
-    # userId = ndb.StringProperty()
     displayName = ndb.StringProperty()
     mainEmail = ndb.StringProperty()
     teeShirtSize = ndb.StringProperty(default='NOT_SPECIFIED')
@@ -30,7 +29,6 @@ class ProfileMiniForm(messages.Message):
 
 class ProfileForm(messages.Message):
     """ProfileForm -- Profile outbound form message"""
-    userId = messages.StringField(1)
     displayName = messages.StringField(2)
     mainEmail = messages.StringField(3)
     teeShirtSize = messages.EnumField('TeeShirtSize', 4)
@@ -118,3 +116,44 @@ class ConflictException(endpoints.ServiceException):
 class StringMessage(messages.Message):
     """StringMessage-- outbound (single) string message"""
     data = messages.StringField(1, required=True)
+
+
+class Speaker(ndb.Model):
+    """Speaker -- Please add a description"""
+    name = ndb.StringProperty(required=True)
+    institution = ndb.StringProperty()
+
+
+class SpeakerForm(messages.Message):
+    """SpeakerForm -- Please add a description"""
+    name = messages.StringField(1, required=True)
+    institution = messages.StringField(2)
+
+
+class Session(ndb.Model):
+    """Session -- Please add a description"""
+    name = ndb.StringProperty(required=True)
+    conferenceId = ndb.StringProperty(required=True)
+    highlights = ndb.StringProperty(repeated=True)
+    speaker = ndb.StringProperty()
+    duration = ndb.IntegerProperty()
+    typeOfSession = ndb.StringProperty()
+    date = ndb.DateProperty()
+    startTime = ndb.TimeProperty()
+
+
+class SessionForm(messages.Message):
+    """SessionForm -- Please add a description"""
+    name = messages.StringField(1, required=True)
+    conferenceId = messages.StringField(2)
+    highlights = messages.StringField(3, repeated=True)
+    speaker = messages.StringField(4)
+    duration = messages.IntegerField(5, variant=messages.Variant.INT32)
+    typeOfSession = messages.StringField(6)
+    date = messages.StringField(7)
+    startTime = messages.StringField(8)
+
+
+class SessionForms(messages.Message):
+    """SessionForms -- multiple Session outbound form message"""
+    items = messages.MessageField(SessionForm, 1, repeated=True)
