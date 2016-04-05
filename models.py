@@ -138,8 +138,8 @@ class SpeakerForm(messages.Message):
 class Session(ndb.Model):
     """Session -- Please add a description"""
     name = ndb.StringProperty(required=True)
-    conferenceId = ndb.StringProperty(required=True)
-    speakerId = ndb.StringProperty()
+    conferenceKey = ndb.StringProperty(required=True)
+    speakerKey = ndb.StringProperty()
     highlights = ndb.StringProperty(repeated=True)
     duration = ndb.IntegerProperty()
     typeOfSession = ndb.StringProperty()
@@ -150,14 +150,15 @@ class Session(ndb.Model):
 class SessionForm(messages.Message):
     """SessionForm -- Please add a description"""
     name = messages.StringField(1, required=True)
-    conferenceId = messages.StringField(2)
-    speakerId = messages.StringField(3)
+    conferenceKey = messages.StringField(2)
+    speakerKey = messages.StringField(3)
     highlights = messages.StringField(4, repeated=True)
     duration = messages.IntegerField(5, variant=messages.Variant.INT32)
     typeOfSession = messages.StringField(6)
     date = messages.StringField(7)
     startTime = messages.StringField(8)
     speakerName = messages.StringField(9)
+    websafeKey = messages.StringField(10)
 
 
 class SessionForms(messages.Message):
