@@ -681,12 +681,11 @@ class ConferenceApi(remote.Service):
     # - - - Sessions - - - - - - - - - - - - - - - - - - - -
 
     @staticmethod
-    def _copy_session_to_form(session, speakerName):
+    def _copy_session_to_form(session):
         """
         Copy relevant fields from Session to SessionForm.
 
         Args:
-            speakerName (basestring):
             session: The Session object.
 
         Returns:
@@ -700,14 +699,38 @@ class ConferenceApi(remote.Service):
                     setattr(ss, field.name, str(getattr(session, field.name)))
                 elif field.name == 'startTime':
                     setattr(ss, field.name, str(getattr(session, field.name)))
+                elif field.name == 'speakerKey':
+                    speaker = ndb.Key(urlsafe=getattr(session,
+                                                      field.name)).get()
+                    if speaker:
+                        setattr(ss, field.name, speaker.key.urlsafe())
+                        setattr(ss, 'speakerName', speaker.name)
                 else:
                     setattr(ss, field.name, getattr(session, field.name))
-            if speakerName:
-                setattr(ss, 'speakerName', speakerName)
+            elif field.name == "websafeKey":
+                setattr(ss, field.name, session.key.urlsafe())
         ss.check_initialized()
         return ss
 
     def _create_session_object(self, request):
+        """
+        Add a Session to the Datastore with the SESSION_REQUEST request.
+
+        Args:
+            request: The SESSION_REQUEST request sent to createSpeaker
+            endpoint.
+
+        Returns:
+            A SessionForm object updated with the request info.
+        Raises:
+            endpoints.BadRequestException: An error if name field not in
+            request.
+            endpoints.NotFoundException: An error if no conference is found
+            with the websafeConferenceKey.
+            endpoints.UnauthorizedException: An error if user is not logged in.
+            endpoints.UnauthorizedException: An error if the user trying to
+            create the session is not the conference organizer.
+        """
         if not request.name:
             raise endpoints.BadRequestException(
                 "Session 'name' field required")
@@ -747,35 +770,50 @@ class ConferenceApi(remote.Service):
         s_key = ndb.Key(Session, s_id, parent=c_key)
 
         data['key'] = s_key
-        request.conferenceId = request.websafeConferenceKey
-        data['conferenceId'] = request.conferenceId
+        request.conferenceKey = request.websafeConferenceKey
+        data['conferenceKey'] = request.conferenceKey
         del data['websafeConferenceKey']
+        del data['websafeKey']
         del data['speakerName']
-
-        if data['speakerId']:
-            sp_key = ndb.Key(urlsafe=request.speakerId)
-            speaker_obj = sp_key.get()
-            # speaker = Speaker.query().filter(Speaker.key == sp_key)
-            # data['speakerId'] = request.speakerId
 
         # create Session & return (modified) SessionForm
         sess = Session(**data)
         sess.put()
 
-        return self._copy_session_to_form(sess, speaker_obj.name)
+        return self._copy_session_to_form(sess)
 
     @endpoints.method(SESSION_REQUEST, SessionForm,
                       path='conference/{websafeConferenceKey}/addsession',
                       http_method='POST', name='createSession')
     def create_session(self, request):
-        """create_session documentation"""
+        """
+        Create a new session to the Conference.
+
+        Args:
+            request: The SESSION_REQUEST request sent to this API endpoint.
+
+        Returns:
+            A SessionForm updated after storing in Datastore.
+        """
         return self._create_session_object(request)
 
     @endpoints.method(CONF_GET_REQUEST, SessionForms,
                       path='conference/{websafeConferenceKey}/sessions',
                       http_method='GET', name='getConferenceSessions')
     def get_conference_sessions(self, request):
-        """get_conference_sessions documentation"""
+        """
+        Get all Conference Sessions.
+
+        Args:
+            request: The CONF_GET_REQUEST request sent to this API endpoint.
+
+        Returns:
+            A SessionForms object with all the sessions of the Conference.
+
+        Raises:
+            endpoints.NotFoundException: An error if no conference found with
+            websafeConferenceKey.
+        """
         # get Conference object from request; bail if not found
         c_key = ndb.Key(urlsafe=request.websafeConferenceKey)
         conf = c_key.get()
@@ -793,7 +831,20 @@ class ConferenceApi(remote.Service):
                       path='conference/{websafeConferenceKey}/{typeOfSession}',
                       http_method='GET', name='getConferenceSessionsByType')
     def get_conference_sessions_by_type(self, request):
-        """get_conference_sessions_by_type documentation"""
+        """
+        Get all Conference Sessions with an specific type.
+
+        Args:
+            request: The SESSION_GET_REQUEST request sent to this API endpoint.
+
+        Returns:
+            A SessionForms object with all the sessions of the Conference with
+            an specific type.
+
+        Raises:
+            endpoints.NotFoundException: An error if no conference found with
+            websafeConferenceKey.
+        """
         # get Conference object from request; bail if not found
         c_key = ndb.Key(urlsafe=request.websafeConferenceKey)
         conf = c_key.get()
@@ -810,9 +861,23 @@ class ConferenceApi(remote.Service):
 
     @endpoints.method(SESSION_SPEAKER_GET_REQUEST, SessionForms,
                       path='sessions/{websafeSpeakerKey}',
-                      http_method='GET', name='getConferenceBySpeaker')
-    def get_conference_by_speaker(self, request):
-        """get_conference_by_speaker documentation"""
+                      http_method='GET', name='getSessionsBySpeaker')
+    def get_sessions_by_speaker(self, request):
+        """
+        Get all Sessions given by an specific Speaker across all Conferences.
+
+        Args:
+            request: The SESSION_SPEAKER_GET_REQUEST request sent to this API
+            endpoint.
+
+        Returns:
+            A SessionForms object with all the sessions by the specific Speaker
+            across all Conferences.
+
+        Raises:
+            endpoints.NotFoundException: An error if no speaker found with
+            websafeSpeakerKey.
+        """
         # get Speaker object from request; bail if not found
         speaker = ndb.Key(urlsafe=request.websafeSpeakerKey).get()
         if not speaker:
@@ -820,9 +885,10 @@ class ConferenceApi(remote.Service):
                 'No speaker found with key: {}'.format(
                     request.websafeSpeakerKey))
         q = Session.query()
-        q = q.filter(Session.speakerId == request.websafeSpeakerKey)
+        # q = q.filter(Session.speakerKey == speaker.key.urlsafe())
+        q = q.filter(Session.speakerKey == speaker.key.id())
         return SessionForms(
-            items=[self._copy_session_to_form(sess, speaker.name)
+            items=[self._copy_session_to_form(sess)
                    for sess in q]
         )
 
@@ -840,14 +906,26 @@ class ConferenceApi(remote.Service):
         sp = SpeakerForm()
         for field in sp.all_fields():
             if hasattr(speaker, field.name):
-                if field.name == "websafeKey":
-                    setattr(sp, field.name, speaker.key.urlsafe())
                 setattr(sp, field.name, getattr(speaker, field.name))
+            elif field.name == "websafeKey":
+                setattr(sp, field.name, speaker.key.urlsafe())
         sp.check_initialized()
         return sp
 
-    @staticmethod
-    def _create_speaker_object(request):
+    def _create_speaker_object(self, request):
+        """
+        Add a Speaker to the Datastore with the SpeakerForm request.
+
+        Args:
+            request: The SpeakerForm request sent to createSpeaker endpoint.
+
+        Returns:
+            A SpeakerForm object updated with the request info.
+
+        Raises:
+            endpoints.UnauthorizedException: An error if the user is not logged
+            in.
+        """
         user = endpoints.get_current_user()
         if not user:
             raise endpoints.UnauthorizedException('Authorization required')
@@ -874,13 +952,21 @@ class ConferenceApi(remote.Service):
             speaker = Speaker(**data)
             speaker.put()
 
-        return request
+        return self._copy_speaker_to_form(speaker)
 
     @endpoints.method(SpeakerForm, SpeakerForm,
                       path='speaker', http_method='POST',
                       name='createSpeaker')
     def create_speaker(self, request):
-        """create_speaker documentation"""
+        """
+        Create a Speaker and store it to Datastore.
+
+        Args:
+            request: The SpeakerForm request sent to this API endpoint.
+
+        Returns:
+            A SpeakerForm object updated after store in Datastore.
+        """
         return self._create_speaker_object(request)
 
 
