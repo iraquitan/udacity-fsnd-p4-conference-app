@@ -69,7 +69,7 @@ SESSION_REQUEST = endpoints.ResourceContainer(
     websafeConferenceKey=messages.StringField(1),
 )
 
-SESSION_GET_REQUEST = endpoints.ResourceContainer(
+SESSION_TYPE_GET_REQUEST = endpoints.ResourceContainer(
     message_types.VoidMessage,
     websafeConferenceKey=messages.StringField(1),
     typeOfSession=messages.StringField(2)
@@ -78,6 +78,11 @@ SESSION_GET_REQUEST = endpoints.ResourceContainer(
 SESSION_SPEAKER_GET_REQUEST = endpoints.ResourceContainer(
     message_types.VoidMessage,
     websafeSpeakerKey=messages.StringField(1)
+)
+
+SESSION_GET_REQUEST = endpoints.ResourceContainer(
+    message_types.VoidMessage,
+    websafeSessionKey=messages.StringField(1)
 )
 
 MEMCACHE_ANNOUNCEMENTS_KEY = "RECENT ANNOUNCEMENTS"
@@ -827,7 +832,7 @@ class ConferenceApi(remote.Service):
                    for sess in conf_sessions]
         )
 
-    @endpoints.method(SESSION_GET_REQUEST, SessionForms,
+    @endpoints.method(SESSION_TYPE_GET_REQUEST, SessionForms,
                       path='conference/{websafeConferenceKey}/{typeOfSession}',
                       http_method='GET', name='getConferenceSessionsByType')
     def get_conference_sessions_by_type(self, request):
@@ -835,7 +840,7 @@ class ConferenceApi(remote.Service):
         Get all Conference Sessions with an specific type.
 
         Args:
-            request: The SESSION_GET_REQUEST request sent to this API endpoint.
+            request: The SESSION_TYPE_GET_REQUEST request sent to this API endpoint.
 
         Returns:
             A SessionForms object with all the sessions of the Conference with
@@ -969,6 +974,46 @@ class ConferenceApi(remote.Service):
         """
         return self._create_speaker_object(request)
 
+    # - - - Sessions Wishlist - - - - - - - - - - - - - - - - - - -
+
+    def _add_to_wishlist(self, request, add=True):
+        prof = self._get_profile_from_user()
+        wssk = request.websafeConferenceKey
+        session = ndb.Key(urlsafe=wssk).get()
+        if not session:
+            raise endpoints.NotFoundException(
+                'No conference found with key: %s' % wssk)
+
+        if session.conferenceKey not in prof.conferenceKeysToAttend:
+            raise ConflictException(
+                "You are not registered in this Session's Conference")
+        if add:
+            # check if user already added session to wishlist
+            if wssk in prof.sessionsWishlist:
+                raise ConflictException(
+                    "You have already added this session to wishlist")
+            # add session to user wishlist
+            prof.sessionsWishlist.append(wssk)
+            retval = True
+        else:
+            # check if user already registered
+            if wssk in prof.sessionsWishlist:
+                # remove from user wishlist
+                prof.sessionsWishlist.remove(wssk)
+                retval = True
+
+        # write things back to the datastore & return
+        prof.put()
+
+        return BooleanMessage(data=retval)
+
+    @endpoints.method(SESSION_GET_REQUEST, message_types.VoidMessage,
+                      path='wishlist/{websafeSessionKey}',
+                      http_method='POST', name='addSessionToWishlist')
+    def add_session_to_wishlist(self, request):
+        """add_session_to_wishlist documentation"""
+        return self._add_to_wishlist(request)
+        
 
 # registers API
 api = endpoints.api_server([ConferenceApi])
