@@ -25,7 +25,8 @@ from google.appengine.api import memcache
 
 from models import Profile, ConferenceForm, Conference, ConferenceQueryForms, \
     ConferenceForms, BooleanMessage, ConflictException, StringMessage, \
-    SessionForm, Session, SessionForms, SpeakerForm, Speaker, SessionByTypeForm
+    SessionForm, Session, SessionForms, SpeakerForm, Speaker, SessionByTypeForm, \
+    SessionQueryForm, SessionQueryForms
 from models import ProfileMiniForm
 from models import ProfileForm
 from models import TeeShirtSize
@@ -82,6 +83,11 @@ SESSION_SPEAKER_GET_REQUEST = endpoints.ResourceContainer(
 SESSION_GET_REQUEST = endpoints.ResourceContainer(
     message_types.VoidMessage,
     websafeSessionKey=messages.StringField(1)
+)
+
+CONF_SESSION_REQUEST = endpoints.ResourceContainer(
+    SessionQueryForms,
+    websafeConferenceKey=messages.StringField(1)
 )
 
 SESSION_FIELDS = {
@@ -362,7 +368,7 @@ class ConferenceApi(remote.Service):
         return q
 
     @staticmethod
-    def _format_filters(filters):
+    def _format_filters(filters, filter_type='conference'):
         """
         Parse, check validity and format user supplied filters.
 
@@ -387,7 +393,14 @@ class ConferenceApi(remote.Service):
                      f.all_fields()}
 
             try:
-                filtr["field"] = FIELDS[filtr["field"]]
+                if filter_type == 'conference':
+                    filtr["field"] = FIELDS[filtr["field"]]
+                elif filter_type == 'session':
+                    filtr["field"] = SESSION_FIELDS[filtr["field"]]
+                else:
+                    raise ValueError("'filter_type' with value {} not "
+                                     "supported. Should be 'conference' or "
+                                     "'session'".format(filter_type))
                 filtr["operator"] = OPERATORS[filtr["operator"]]
             except KeyError:
                 raise endpoints.BadRequestException(
@@ -1044,7 +1057,8 @@ class ConferenceApi(remote.Service):
         return self._add_to_wishlist(request)
 
     @endpoints.method(SESSION_GET_REQUEST, BooleanMessage,
-                      path='wishlist/{websafeSessionKey}/delete', http_method='POST', name='deleteSessionInWishlist')
+                      path='wishlist/{websafeSessionKey}/delete',
+                      http_method='POST', name='deleteSessionInWishlist')
     def delete_session_in_wishlist(self, request):
         """
         Delete a session from user wishlist.
@@ -1079,6 +1093,95 @@ class ConferenceApi(remote.Service):
         # return set of SessionForm objects per Session
         return SessionForms(items=[self._copy_session_to_form(sess)
                                    for sess in sessions])
+
+    def _get_session_query(self, request):
+        """
+        Return formatted query from the submitted filters.
+
+        Args:
+            request: The request sent to this API endpoint.
+
+        Returns:
+            A query object after applying the filters.
+
+        Raises:
+            endpoints.NotFoundException: An error if no conference found with
+            websafeConferenceKey
+        """
+        conf = ndb.Key(urlsafe=request.websafeConferenceKey).get()
+        if not conf:
+            raise endpoints.NotFoundException(
+                'No conference found with key: {}'.format(
+                    request.websafeConferenceKey))
+        q = Session.query(ancestor=conf.key)
+        inequality_filter, filters = self._format_filters(
+            request.filters, filter_type='session')
+
+        # If exists, sort on inequality filter first
+        if not inequality_filter:
+            q = q.order(Session.name)
+        else:
+            q = q.order(ndb.GenericProperty(inequality_filter))
+            q = q.order(Session.name)
+
+        for filtr in filters:
+            if filtr["field"] == "duration":
+                filtr["value"] = int(filtr["value"])
+            elif filtr["field"] == "startTime":
+                # To compare just the time, used the same date stored in Data-
+                # store
+                filtr["value"] = datetime.strptime(
+                    "1970-01-01 {}".format(str(filtr["value"])),
+                    "%Y-%m-%d %H:%M")
+            elif filtr["field"] == 'date':
+                filtr["value"] = datetime.strptime(filtr["value"],
+                                                   "%Y-%m-%d")
+            formatted_query = ndb.query.FilterNode(filtr["field"],
+                                                   filtr["operator"],
+                                                   filtr["value"])
+            q = q.filter(formatted_query)
+        return q
+
+    @endpoints.method(CONF_SESSION_REQUEST, SessionForms,
+                      path='conference/{websafeConferenceKey}/query-sessions',
+                      http_method='POST', name='queryConferenceSessions')
+    def query_conference_sessions(self, request):
+        """query_conference_sessions documentation"""
+        sessions = self._get_session_query(request)
+
+        # return individual SessionForm object per Session
+        return SessionForms(
+            items=[self._copy_session_to_form(sess)
+                   for sess in sessions]
+        )
+
+    @endpoints.method(
+        CONF_GET_REQUEST, SessionForms,
+        path='conference/{websafeConferenceKey}/inequery-sessions',
+        http_method='GET', name='queryConferenceSessionsProblem')
+    def query_conference_session_problem(self, request):
+        """query_conference_session_problem documentation"""
+        conf = ndb.Key(urlsafe=request.websafeConferenceKey).get()
+        if not conf:
+            raise endpoints.NotFoundException(
+                'No conference found with key: {}'.format(
+                    request.websafeConferenceKey))
+        q = Session.query(ancestor=conf.key)
+        # 1st query with inequality in typeOfSession field
+        q1 = q.filter(Session.typeOfSession != 'Workshop')
+        q1k = [i.key for i in q1]
+        # 2nd query with inequality in startTime field
+        q2 = q.filter(
+            Session.startTime > datetime.strptime("19:00", "%H:%M").time())
+        q2k = [i.key for i in q2]
+        itsq = list(set(q1k).intersection(set(q2k)))
+        print itsq
+        sessions = ndb.get_multi(itsq)
+        # return individual SessionForm object per Session
+        return SessionForms(
+            items=[self._copy_session_to_form(sess)
+                   for sess in sessions]
+        )
 
 # registers API
 api = endpoints.api_server([ConferenceApi])

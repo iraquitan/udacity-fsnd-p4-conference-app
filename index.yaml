@@ -119,3 +119,52 @@ indexes:
   properties:
   - name: topics
   - name: name
+
+- kind: Session
+  ancestor: yes
+  properties:
+  - name: date
+  - name: name
+
+- kind: Session
+  ancestor: yes
+  properties:
+  - name: startTime
+
+- kind: Session
+  ancestor: yes
+  properties:
+  - name: startTime
+  - name: name
+
+- kind: Session
+  ancestor: yes
+  properties:
+  - name: startTime
+  - name: typeOfSession
+  - name: name
+
+- kind: Session
+  ancestor: yes
+  properties:
+  - name: typeOfSession
+
+- kind: Session
+  ancestor: yes
+  properties:
+  - name: typeOfSession
+  - name: duration
+  - name: name
+
+- kind: Session
+  ancestor: yes
+  properties:
+  - name: typeOfSession
+  - name: name
+
+- kind: Session
+  ancestor: yes
+  properties:
+  - name: typeOfSession
+  - name: startTime
+  - name: name
