@@ -25,7 +25,7 @@ from google.appengine.api import memcache
 
 from models import Profile, ConferenceForm, Conference, ConferenceQueryForms, \
     ConferenceForms, BooleanMessage, ConflictException, StringMessage, \
-    SessionForm, Session, SessionForms, SpeakerForm, Speaker
+    SessionForm, Session, SessionForms, SpeakerForm, Speaker, SessionByTypeForm
 from models import ProfileMiniForm
 from models import ProfileForm
 from models import TeeShirtSize
@@ -64,15 +64,14 @@ CONF_GET_REQUEST = endpoints.ResourceContainer(
     websafeConferenceKey=messages.StringField(1),
 )
 
-SESSION_REQUEST = endpoints.ResourceContainer(
+SESSION_ADD_REQUEST = endpoints.ResourceContainer(
     SessionForm,
     websafeConferenceKey=messages.StringField(1),
 )
 
-SESSION_TYPE_GET_REQUEST = endpoints.ResourceContainer(
-    message_types.VoidMessage,
+SESSION_BY_TYPE_REQUEST = endpoints.ResourceContainer(
+    SessionByTypeForm,
     websafeConferenceKey=messages.StringField(1),
-    typeOfSession=messages.StringField(2)
 )
 
 SESSION_SPEAKER_GET_REQUEST = endpoints.ResourceContainer(
@@ -84,6 +83,13 @@ SESSION_GET_REQUEST = endpoints.ResourceContainer(
     message_types.VoidMessage,
     websafeSessionKey=messages.StringField(1)
 )
+
+SESSION_FIELDS = {
+    'TYPE': 'typeOfSession',
+    'DATE': 'date',
+    'START_TIME': 'startTime',
+    'DURATION': 'duration',
+}
 
 MEMCACHE_ANNOUNCEMENTS_KEY = "RECENT ANNOUNCEMENTS"
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -719,10 +725,10 @@ class ConferenceApi(remote.Service):
 
     def _create_session_object(self, request):
         """
-        Add a Session to the Datastore with the SESSION_REQUEST request.
+        Add a Session to the Datastore with the SESSION_ADD_REQUEST request.
 
         Args:
-            request: The SESSION_REQUEST request sent to createSpeaker
+            request: The SESSION_ADD_REQUEST request sent to createSpeaker
             endpoint.
 
         Returns:
@@ -787,7 +793,7 @@ class ConferenceApi(remote.Service):
 
         return self._copy_session_to_form(sess)
 
-    @endpoints.method(SESSION_REQUEST, SessionForm,
+    @endpoints.method(SESSION_ADD_REQUEST, SessionForm,
                       path='conference/{websafeConferenceKey}/addsession',
                       http_method='POST', name='createSession')
     def create_session(self, request):
@@ -795,7 +801,7 @@ class ConferenceApi(remote.Service):
         Create a new session to the Conference.
 
         Args:
-            request: The SESSION_REQUEST request sent to this API endpoint.
+            request: The SESSION_ADD_REQUEST request sent to this API endpoint.
 
         Returns:
             A SessionForm updated after storing in Datastore.
@@ -820,21 +826,21 @@ class ConferenceApi(remote.Service):
             websafeConferenceKey.
         """
         # get Conference object from request; bail if not found
-        c_key = ndb.Key(urlsafe=request.websafeConferenceKey)
-        conf = c_key.get()
+        conf = ndb.Key(urlsafe=request.websafeConferenceKey).get()
         if not conf:
             raise endpoints.NotFoundException(
                 'No conference found with key: {}'.format(
                     request.websafeConferenceKey))
-        conf_sessions = Session.query(ancestor=c_key)
+        conf_sessions = Session.query(ancestor=conf.key)
         return SessionForms(
             items=[self._copy_session_to_form(sess)
                    for sess in conf_sessions]
         )
 
-    @endpoints.method(SESSION_TYPE_GET_REQUEST, SessionForms,
-                      path='conference/{websafeConferenceKey}/{typeOfSession}',
-                      http_method='GET', name='getConferenceSessionsByType')
+    @endpoints.method(
+        SESSION_BY_TYPE_REQUEST, SessionForms,
+        path='conference/{websafeConferenceKey}/sessions-by-type',
+        http_method='POST', name='getConferenceSessionsByType')
     def get_conference_sessions_by_type(self, request):
         """
         Get all Conference Sessions with an specific type.
@@ -851,13 +857,12 @@ class ConferenceApi(remote.Service):
             websafeConferenceKey.
         """
         # get Conference object from request; bail if not found
-        c_key = ndb.Key(urlsafe=request.websafeConferenceKey)
-        conf = c_key.get()
+        conf = ndb.Key(urlsafe=request.websafeConferenceKey).get()
         if not conf:
             raise endpoints.NotFoundException(
                 'No conference found with key: {}'.format(
                     request.websafeConferenceKey))
-        q = Session.query(ancestor=c_key)
+        q = Session.query(ancestor=conf.key)
         q = q.filter(Session.typeOfSession == request.typeOfSession)
         return SessionForms(
             items=[self._copy_session_to_form(sess)
@@ -890,8 +895,7 @@ class ConferenceApi(remote.Service):
                 'No speaker found with key: {}'.format(
                     request.websafeSpeakerKey))
         q = Session.query()
-        # q = q.filter(Session.speakerKey == speaker.key.urlsafe())
-        q = q.filter(Session.speakerKey == speaker.key.id())
+        q = q.filter(Session.speakerKey == speaker.key.urlsafe())
         return SessionForms(
             items=[self._copy_session_to_form(sess)
                    for sess in q]
