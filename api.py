@@ -98,6 +98,7 @@ SESSION_FIELDS = {
 }
 
 MEMCACHE_ANNOUNCEMENTS_KEY = "RECENT ANNOUNCEMENTS"
+MEMCACHE_FEATURED_SPEAKER = "FEATURED SPEAKER"
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 
@@ -804,6 +805,13 @@ class ConferenceApi(remote.Service):
         sess = Session(**data)
         sess.put()
 
+        # check featured speaker if session have speaker
+        speaker = ndb.Key(urlsafe=sess.speakerKey).get()
+        if speaker:
+            taskqueue.add(params={'speakerKey': sess.speakerKey,
+                                  'sessionKey': sess.key.urlsafe()},
+                          url='/tasks/check_featured_speaker'
+                          )
         return self._copy_session_to_form(sess)
 
     @endpoints.method(SESSION_ADD_REQUEST, SessionForm,
@@ -1146,7 +1154,15 @@ class ConferenceApi(remote.Service):
                       path='conference/{websafeConferenceKey}/query-sessions',
                       http_method='POST', name='queryConferenceSessions')
     def query_conference_sessions(self, request):
-        """query_conference_sessions documentation"""
+        """
+        Query conference sessions according to filters.
+
+        Args:
+            request: CONF_SESSION_REQUEST.
+
+        Returns:
+            SessionForms: A list of SessionForm for every session in query.
+        """
         sessions = self._get_session_query(request)
 
         # return individual SessionForm object per Session
@@ -1160,7 +1176,17 @@ class ConferenceApi(remote.Service):
         path='conference/{websafeConferenceKey}/inequery-sessions',
         http_method='GET', name='queryConferenceSessionsProblem')
     def query_conference_session_problem(self, request):
-        """query_conference_session_problem documentation"""
+        """
+        Query conference sessions with two inequalities on different fields.
+        Query sessions that are not of the type 'Workshop' and start time is
+        after 19:00.
+
+        Args:
+            request: CONF_SESSION_REQUEST.
+
+        Returns:
+            SessionForms: A list of SessionForm for every session in query.
+        """
         conf = ndb.Key(urlsafe=request.websafeConferenceKey).get()
         if not conf:
             raise endpoints.NotFoundException(
@@ -1182,6 +1208,57 @@ class ConferenceApi(remote.Service):
             items=[self._copy_session_to_form(sess)
                    for sess in sessions]
         )
+
+    # - - - Featured Speaker - - - - - - - - - - - - - - - - - - - -
+
+    @staticmethod
+    def _check_speaker(speaker_key, session_key):
+        """
+        Check speaker and assign to memcache if speaker has more than one
+        session in the same confernence. Used by memcache task queue.
+
+        Returns:
+            A string with the featured speaker. Empty string if speaker has no
+            other session in this conference.
+        """
+        speaker = ndb.Key(urlsafe=speaker_key).get()
+        session = ndb.Key(urlsafe=session_key).get()
+        conf = session.key.parent().get()
+        # get all conference sessions
+        q = Session.query(ancestor=conf.key)
+        # get all conference sessions by the speaker
+        speaker_sessions = q.filter(
+            Session.speakerKey == speaker.key.urlsafe()).fetch(2)
+        # if more than one session returned, add to memcache
+        if len(speaker_sessions) > 1:
+            featured_speaker = "{0} by {1}".format(session.name, speaker.name)
+            memcache.set(MEMCACHE_FEATURED_SPEAKER, featured_speaker)
+        else:
+            # delete the memcache featured speaker entry
+            featured_speaker = ""
+            memcache.delete(MEMCACHE_FEATURED_SPEAKER)
+
+        return featured_speaker
+
+    @endpoints.method(message_types.VoidMessage, StringMessage,
+                      path='conference/featured-speaker/get',
+                      http_method='GET', name='getFeaturedSpeaker')
+    def get_featured_speaker(self, request):
+        """
+        Return featured speaker from memcache.
+
+        Args:
+            request: Empty GET request
+
+        Returns:
+            A StringMessage with the featured speaker. Empty string if speaker
+            has no other session in this conference.
+        """
+        # return an existing featured speaker from Memcache or an empty string.
+        featured_speakers = memcache.get(MEMCACHE_FEATURED_SPEAKER)
+        if not featured_speakers:
+            featured_speakers = ""
+        return StringMessage(data=featured_speakers)
 
 # registers API
 api = endpoints.api_server([ConferenceApi])
