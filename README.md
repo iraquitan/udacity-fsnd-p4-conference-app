@@ -23,7 +23,7 @@ A project for a conference app, where users can sign up with their Google accoun
     * In __Authorized redirect URIs__ add `https://your-app-id.appspot.com/oauth2callback` and `http://localhost:8080/oauth2callback` if you are using port 8080.
 * Update `your-web-client-id` in **settings.py** with your web client ID that looks like this: `your-web-client-id.apps.googleusercontent.com`.	
 * Update `CLIENT_ID` in Oauth2Provider, located in **static/js/app.js** with your web client ID that looks like this: `your-web-client-id.apps.googleusercontent.com`.
-* To test locally, you can use the **GoogleAppEngineLauncher SDK** utility or use command line as follows:
+* To test locally, you can use the `**GoogleAppEngineLauncher SDK** utility or use command line as follows:
     * `$ dev_appserver.py ./` if you are currently in the project folder.
     * Then head to `http://localhost:8080` to see the application running.
     * Or to `http://localhost:8080/_ah/api/explorer` to see the API endpoints of the running application.
@@ -31,6 +31,10 @@ A project for a conference app, where users can sign up with their Google accoun
     * `$ appcfg.py -A YOUR_PROJECT_ID -V v1 update ./` if you are currently in the project folder.
     * Then head to `https://your-app-id.appspot.com` to see the application running in the cloud.
     * Or to `https://your-app-id.appspot.com/_ah/api/explorer` to see the API endpoints of the application running in the cloud.
+
+## Info about Sessions and Speakers
+* Speakers are implemented as an entity.
+* To add a Session with speaker, you must first add a Speaker, and use his `websafeKey` in the Session `speakerKey` field.
 
 ## Creator
 **Iraquitan Cordeiro Filho**
