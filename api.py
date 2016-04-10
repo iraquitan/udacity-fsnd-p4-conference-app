@@ -26,7 +26,8 @@ from google.appengine.api import memcache
 from models import Profile, ConferenceForm, Conference, ConferenceQueryForms, \
     ConferenceForms, BooleanMessage, ConflictException, StringMessage, \
     SessionForm, Session, SessionForms, SpeakerForm, Speaker, SessionByTypeForm, \
-    SessionQueryForm, SessionQueryForms, SpecificQueryForm, LocationQueryForm
+    SessionQueryForm, SessionQueryForms, SpecificQueryForm, LocationQueryForm, \
+    ConferenceDateRangeForm
 from models import ProfileMiniForm
 from models import ProfileForm
 from models import TeeShirtSize
@@ -532,6 +533,42 @@ class ConferenceApi(remote.Service):
         # return ConferenceForm
         return self._copy_conference_to_form(conf,
                                              getattr(prof, 'displayName'))
+
+    @endpoints.method(ConferenceDateRangeForm, ConferenceForms,
+                      path='conference/range', http_method='POST',
+                      name='getConferencesByDateRange')
+    def get_conferences_by_date_range(self, request):
+        """
+        Return Conferences by date range.
+
+        Args:
+            request: The ConferenceDateRangeForm request sent to this API
+            endpoint.
+
+        Returns:
+            ConferenceForms for all conferences that starts between the date
+            range.
+
+        Raises:
+            endpoints.BadRequestException: An error if request startDate is
+            not earlier than endDate.
+        """
+        conferences = Conference.query()
+        start_date = datetime.strptime(request.startDate, '%Y-%m-%d')
+        end_date = datetime.strptime(request.endDate, '%Y-%m-%d')
+        if start_date > end_date:
+            raise endpoints.BadRequestException("Request 'startDate' must be "
+                                                "earlier than 'endDate'.")
+        # filter by conferences that starts after request startDate
+        conferences = conferences.filter(Conference.startDate > start_date)
+        # filter by conferences that starts before request endDate
+        conferences = conferences.filter(Conference.startDate < end_date)
+        # order by conference start date
+        conferences.order(Conference.startDate)
+        # return set of ConferenceForm objects per Conference
+        return ConferenceForms(items=[self._copy_conference_to_form(conf, "")
+                                      for conf in conferences]
+                               )
 
     @endpoints.method(message_types.VoidMessage, ConferenceForms,
                       path='filterPlayground', http_method='GET',

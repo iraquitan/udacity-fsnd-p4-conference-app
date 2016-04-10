@@ -105,6 +105,14 @@ class ConferenceQueryForms(messages.Message):
     filters = messages.MessageField(ConferenceQueryForm, 1, repeated=True)
 
 
+class ConferenceDateRangeForm(messages.Message):
+    """
+    ConferenceDateRangeForm -- ConferenceDateRangeForm inbound form message
+    """
+    startDate = messages.StringField(1)
+    endDate = messages.StringField(2)
+
+
 class BooleanMessage(messages.Message):
     """BooleanMessage-- outbound Boolean value message"""
     data = messages.BooleanField(1)
