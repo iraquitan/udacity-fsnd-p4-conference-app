@@ -26,7 +26,7 @@ from google.appengine.api import memcache
 from models import Profile, ConferenceForm, Conference, ConferenceQueryForms, \
     ConferenceForms, BooleanMessage, ConflictException, StringMessage, \
     SessionForm, Session, SessionForms, SpeakerForm, Speaker, SessionByTypeForm, \
-    SessionQueryForm, SessionQueryForms
+    SessionQueryForm, SessionQueryForms, SpecificQueryForm, LocationQueryForm
 from models import ProfileMiniForm
 from models import ProfileForm
 from models import TeeShirtSize
@@ -895,7 +895,7 @@ class ConferenceApi(remote.Service):
                       http_method='GET', name='getSessionsBySpeaker')
     def get_sessions_by_speaker(self, request):
         """
-        Get all Sessions given by an specific Speaker across all Conferences.
+        Get all Sessions given by a specific Speaker across all Conferences.
 
         Args:
             request: The SESSION_SPEAKER_GET_REQUEST request sent to this API
@@ -921,6 +921,79 @@ class ConferenceApi(remote.Service):
             items=[self._copy_session_to_form(sess)
                    for sess in q]
         )
+
+    @endpoints.method(SpecificQueryForm, SessionForms,
+                      path='sessions/duration', http_method='POST',
+                      name='getSessionsByDuration')
+    def get_sessions_by_duration(self, request):
+        """
+        Get all Sessions given by a specific duration query across all
+        Conferences.
+
+        Args:
+            request: The SpecificQueryForm request sent to this API
+            endpoint.
+
+        Returns:
+            A SessionForms object with all the sessions that have specified
+            duration across all Conferences.
+
+        Raises:
+            endpoints.BadRequestException: An error if request have invalid
+            operator.
+        """
+        # query all sessions
+        q = Session.query()
+        dur_filter = {field.name: getattr(request, field.name) for field in
+                      request.all_fields()}
+
+        # check if operator is correct
+        try:
+            dur_filter["operator"] = OPERATORS[dur_filter["operator"]]
+        except KeyError:
+            raise endpoints.BadRequestException(
+                "Filter contains invalid field or operator.")
+        # set 'duration' field to filter
+        dur_filter["field"] = 'duration'
+        # generate a FilterNode object query from duration filter
+        print dur_filter
+        formatted_query = ndb.query.FilterNode(dur_filter["field"],
+                                               dur_filter["operator"],
+                                               int(dur_filter["value"]))
+        q = q.filter(formatted_query).order(Session.duration)
+        q = q.order(Session.name)
+        return SessionForms(items=[self._copy_session_to_form(sess)
+                                   for sess in q])
+
+    @endpoints.method(LocationQueryForm, SessionForms,
+                      path='sessions/location', http_method='POST',
+                      name='getSessionsByLocation')
+    def get_sessions_by_location(self, request):
+        """
+        Get all Sessions given by a specific location across all Conferences.
+
+        Args:
+            request: The LocationQueryForm request sent to this API
+            endpoint.
+
+        Returns:
+            A SessionForms object with all the sessions in a specified
+            location across all Conferences.
+
+        Raises:
+            endpoints.BadRequestException: An error if request have invalid
+            operator.
+        """
+        city = request.city
+        conferences = Conference.query(Conference.city == city)
+        c_keys = [c.key.urlsafe() for c in conferences]
+        # use empty string if no conferences in request city is found
+        if len(c_keys) == 0:
+            c_keys = ['']
+        # query all sessions with conferenceKeys taking place in request.city
+        q = Session.query(Session.conferenceKey.IN(c_keys))
+        return SessionForms(items=[self._copy_session_to_form(sess)
+                                   for sess in q])
 
     @staticmethod
     def _copy_speaker_to_form(speaker):

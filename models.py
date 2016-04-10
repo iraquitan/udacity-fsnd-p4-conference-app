@@ -185,3 +185,18 @@ class SessionQueryForms(messages.Message):
     SessionQueryForms -- multiple SessionQueryForm inbound form message
     """
     filters = messages.MessageField(SessionQueryForm, 1, repeated=True)
+
+
+class SpecificQueryForm(messages.Message):
+    """
+    SpecificQueryForm -- Specific query inbound form message
+    """
+    operator = messages.StringField(1)
+    value = messages.StringField(2)
+
+
+class LocationQueryForm(messages.Message):
+    """
+    LocationQueryForm -- Location query inbound form message
+    """
+    city = messages.StringField(1)
