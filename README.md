@@ -4,6 +4,9 @@ A project for a conference app, where users can sign up with their Google accoun
 ## Table of contents
 * [Requirements](#requirements)
 * [Quick start](#quick-start)
+* [Design choices for Sessions and Speakers](#design-choices-for-sessions-and-speakers)
+* [Query Problem](#query-problem)
+* [Additional Queries](#additional-queries)
 * [Creator](#creator)
 * [License](#license)
 
@@ -32,9 +35,44 @@ A project for a conference app, where users can sign up with their Google accoun
     * Then head to `https://your-app-id.appspot.com` to see the application running in the cloud.
     * Or to `https://your-app-id.appspot.com/_ah/api/explorer` to see the API endpoints of the application running in the cloud.
 
-## Info about Sessions and Speakers
-* Speakers are implemented as an entity.
-* To add a Session with speaker, you must first add a Speaker, and use his `websafeKey` in the Session `speakerKey` field.
+## Design choices for Sessions and Speakers
+* Speaker:
+    * Speakers are implemented as an entity.
+    * Speakers have the following fields:
+        * Field Name | Property Type | Aditional Info
+          ---------- | ------------- | --------------
+          name | ndb.StringProperty(required=True) | Used in POST form
+          email | ndb.StringProperty() | Used in POST form
+          institution | ndb.StringProperty() | Used in POST form
+          creatorUserId | ndb.StringProperty() | Used internally when created
+* Session:
+    * Sessions are entities that stores the websafe keys of Conference and Speaker (if it have one).
+    * To add a Session with speaker, you must first add a Speaker, and use his `websafeKey` in the Session `speakerKey` field.
+    * Sessions have the following fields:
+        * Field Name | Property Type | Aditional Info
+          ---------- | ------------- | --------------
+          name | ndb.StringProperty(required=True) | Used in POST form
+          conferenceKey | ndb.StringProperty(required=True) | Querystring arguments passed through ResourceContainer
+          speakerKey | ndb.StringProperty() | Used in POST form
+          highlights | ndb.StringProperty(repeated=True) | Used in POST form
+          duration | ndb.IntegerProperty() | Used in POST form
+          typeOfSession | ndb.StringProperty() | Used in POST form
+          date | ndb.DateProperty() | Used in POST form
+          startTime | ndb.TimeProperty() | Used in POST form
+
+## Query Problem
+* Problem:
+    * The problem is that in the query for all non-workshop before 7pm, there are two fields that need an inequality: `startTime` and `typeOfSession`. One way I think to solve this query is performing then separately and then get the intersection of both results.
+* Solution:
+    * To achieve the desired query result, I performed the two queries separately and stored the resulted sessions websafe keys in two different lists. Then I used the bultin python set type with the intersection method to get the keys that are in both lists. Then I used the ndb.get_multi method to retrieve all desired keys at once.
+    * The solution is implemented in the `queryConferenceSessionsProblem` API endpoint.
+
+## Additional Queries
+* `getSessionsByDuration`: This API endpoint returns all Sessions given by a specific duration and operator (EQ: ==, LT: <, LTEQ: <=, GT: >, GTEQ: >=, NE: !=) across all Conferences.
+* `getSessionsByLocation`: This endpoint gets all Sessions given by a specific city across all Conferences.
+* `getConferencesByDateRange`: This endpoint returns all Conferences starting at a date range (**startDate** and **endDate**) in the format YYYY-mm-dd.
+* `getConferencesAvailableByMonth`: This endpoint returns all Conferences with seats available by a given month.
+
 
 ## Creator
 **Iraquitan Cordeiro Filho**
