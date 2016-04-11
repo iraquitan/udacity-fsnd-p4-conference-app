@@ -101,6 +101,12 @@ indexes:
 - kind: Conference
   properties:
   - name: month
+  - name: seatsAvailable
+  - name: name
+
+- kind: Conference
+  properties:
+  - name: month
   - name: topics
   - name: name
 

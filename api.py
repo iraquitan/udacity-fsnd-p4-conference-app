@@ -27,7 +27,7 @@ from models import Profile, ConferenceForm, Conference, ConferenceQueryForms, \
     ConferenceForms, BooleanMessage, ConflictException, StringMessage, \
     SessionForm, Session, SessionForms, SpeakerForm, Speaker, SessionByTypeForm, \
     SessionQueryForm, SessionQueryForms, SpecificQueryForm, LocationQueryForm, \
-    ConferenceDateRangeForm
+    ConferenceDateRangeForm, ConferenceAvailableForm
 from models import ProfileMiniForm
 from models import ProfileForm
 from models import TeeShirtSize
@@ -566,6 +566,42 @@ class ConferenceApi(remote.Service):
         # order by conference start date
         conferences.order(Conference.startDate)
         # return set of ConferenceForm objects per Conference
+        return ConferenceForms(items=[self._copy_conference_to_form(conf, "")
+                                      for conf in conferences]
+                               )
+
+    @endpoints.method(ConferenceAvailableForm, ConferenceForms,
+                      path='conference/available', http_method='POST',
+                      name='getConferencesAvailableByMonth')
+    def get_conferences_available_by_month(self, request):
+        """
+        Return Conferences available by month.
+
+        Args:
+            request: The ConferenceAvailableForm request sent to this API
+            endpoint.
+
+        Returns:
+            ConferenceForms for all conferences that are available by a given
+            month.
+
+        Raises:
+            endpoints.BadRequestException: An error if request month is not in
+            the range [1 - 12].
+        """
+        month = int(request.month)
+        # check if month is in range
+        print month
+        if month < 1 or month > 12:
+            raise endpoints.BadRequestException("Month should be between 1 "
+                                                "and 12 inclusive.")
+        # query all conferences with seats available
+        conferences = Conference.query(Conference.seatsAvailable > 0)
+        # filter by month
+        conferences = conferences.filter(Conference.month == month)
+        # sort conferences by name
+        conferences = conferences.order(Conference.seatsAvailable)
+        conferences = conferences.order(Conference.name)
         return ConferenceForms(items=[self._copy_conference_to_form(conf, "")
                                       for conf in conferences]
                                )

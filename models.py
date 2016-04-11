@@ -113,6 +113,13 @@ class ConferenceDateRangeForm(messages.Message):
     endDate = messages.StringField(2)
 
 
+class ConferenceAvailableForm(messages.Message):
+    """
+    ConferenceAvailableForm -- ConferenceAvailableForm inbound form message
+    """
+    month = messages.IntegerField(1)
+
+
 class BooleanMessage(messages.Message):
     """BooleanMessage-- outbound Boolean value message"""
     data = messages.BooleanField(1)
